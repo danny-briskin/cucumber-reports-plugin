@@ -120,7 +120,11 @@
         </f:section>
 
         <f:section title="${%presentation}">
-
+            <f:entry
+                    title="${%skippedIsNotFailed.title}"
+                    field="skippedScenarioIsNotFailed">
+                <f:checkbox/>
+            </f:entry>
             <f:entry
                     title="${%sortingMethod.title}"
                     field="sortingMethod">
