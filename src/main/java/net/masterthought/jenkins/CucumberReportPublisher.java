@@ -1,33 +1,17 @@
 package net.masterthought.jenkins;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Serializable;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
-import java.util.UUID;
-
 import hudson.AbortException;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
-import hudson.model.AbstractDescribableImpl;
-import hudson.model.Descriptor;
-import hudson.model.Result;
-import hudson.model.Run;
-import hudson.model.TaskListener;
+import hudson.model.*;
 import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.Recorder;
-
-import javax.annotation.Nonnull;
-
 import jenkins.tasks.SimpleBuildStep;
 import net.masterthought.cucumber.Configuration;
 import net.masterthought.cucumber.ReportBuilder;
 import net.masterthought.cucumber.Reportable;
+import net.masterthought.cucumber.json.support.Status;
 import net.masterthought.cucumber.presentation.PresentationMode;
 import net.masterthought.cucumber.reducers.ReducingMethod;
 import net.masterthought.cucumber.sorting.SortingMethod;
@@ -40,6 +24,14 @@ import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
 import org.jenkinsci.plugins.tokenmacro.TokenMacro;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
+
+import javax.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public class CucumberReportPublisher extends Recorder implements SimpleBuildStep {
 
@@ -70,6 +62,7 @@ public class CucumberReportPublisher extends Recorder implements SimpleBuildStep
 
     private String buildStatus;
     private boolean stopBuildOnFailedReport;
+    private boolean skippedScenarioIsNotFailed;
 
     private int trendsLimit;
     private String sortingMethod;
@@ -315,6 +308,15 @@ public class CucumberReportPublisher extends Recorder implements SimpleBuildStep
         this.stopBuildOnFailedReport = stopBuildOnFailedReport;
     }
 
+    @DataBoundSetter
+    public void setSkippedScenarioIsNotFailed(boolean skippedScenarioIsNotFailed) {
+        this.skippedScenarioIsNotFailed = skippedScenarioIsNotFailed;
+    }
+
+    public boolean getSkippedScenarioIsNotFailed() {
+        return skippedScenarioIsNotFailed;
+    }
+
     public boolean getStopBuildOnFailedReport() {
         return stopBuildOnFailedReport;
     }
@@ -478,6 +480,12 @@ public class CucumberReportPublisher extends Recorder implements SimpleBuildStep
         configuration.setDirectorySuffix(getDirectorySuffix());
         configuration.setTrends(new File(trendsDir, TRENDS_FILE), trendsLimit);
         configuration.setSortingMethod(SortingMethod.valueOf(sortingMethod));
+
+        if (this.skippedScenarioIsNotFailed) {
+            HashSet<Status> notFailingStatuses = new HashSet<>();
+            notFailingStatuses.add(Status.SKIPPED);
+            configuration.setNotFailingStatuses(notFailingStatuses);
+        }
         if (mergeFeaturesById) {
             configuration.addReducingMethod(ReducingMethod.MERGE_FEATURES_BY_ID);
         }
@@ -708,7 +716,8 @@ public class CucumberReportPublisher extends Recorder implements SimpleBuildStep
         return BuildStepMonitor.NONE;
     }
 
-    public static class Classification extends AbstractDescribableImpl<Classification> implements Serializable {
+    public static class Classification extends AbstractDescribableImpl<Classification> implements
+            Serializable {
 
         public String key;
         public String value;
